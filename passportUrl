@@ -1,0 +1,11 @@
+fetch('http://cdb.neurop.org:8080/npe/connect/authorize?client_id=62&response_type=token&response_mode=form_post&redirect_uri=http://pacific-everglades-70974.herokuapp.com/&scope=api&state=1')
+.then(function(response) {
+	console.log('Response', response);
+})
+.catch(function(err) {  
+	console.log('Fetch Error :', err);  
+});
+
+
+
+https://passport.neurop.org/login

@@ -1,0 +1,14 @@
+http://cdb.neurop.org:8080/npe/connect/authorize?client_id=62&response_type=token&response_mode=form_post&redirect_uri=http://pacific-everglades-70974.herokuapp.com/&scope=api&state=1
+
+maxkite15@gmail.com
+
+FuwHQCxDe7QgZcw
+
+
+
+
+
+
+https://cdb.neurop.org/api/secured/eventdata/find?Start=2019-06-05T12%3A00%3A00&Stop=2019-06-05T13%3A00%3A00&Group=bio&Class=mental&Kind=Stress_Avg
+https://cdb.neurop.org/api/secured/eventdata/find?Start=2019-06-05T12%3A00%3A00&Stop=2019-06-05T13%3A00%3A00&Group=bio&Class=mental&Kind=Lucidity_Avg
+https://cdb.neurop.org/api/secured/eventdata/find?Start=2019-06-05T12%3A00%3A00&Stop=2019-06-05T13%3A00%3A00&Group=bio&Class=mental&Kind=CognitiveLoad_Avg
