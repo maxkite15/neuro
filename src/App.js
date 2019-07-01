@@ -274,7 +274,7 @@ export default class App extends Component {
                 }
             }
 			//работоспособность
-			if(iObj.s[0].v === 0 || iObj.s[0].v === =2){
+			if(iObj.s[0].v === 0 || iObj.s[0].v === -2){
 				if(chartsData[key]) {
                     if (!chartsData[key]['performance']) chartsData[key]['performance'] = {count: 0};
                     chartsData[key]['performance'].count++;
