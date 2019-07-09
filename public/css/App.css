@@ -48,5 +48,31 @@ html, body {
 }
 
 .Charts {
-  height: calc(100% - 50px);
+  height: calc(100% - 15px);
+}
+
+.chart-block {
+    width: calc(50% - 4px);
+    height: calc(50% - 4px);
+    float: left;
+    border: 1px solid black;
+    margin: 2px;
+}
+
+.chart-head {
+  height: 25px;
+  text-align: left;
+  padding-left: 5px;
+  border-bottom: 1px solid black;
+}
+
+.chart-body {
+  height: calc(100% - 25px);
+}
+
+.chart-head .label {
+  width: 100%;
+  text-transform: uppercase;
+  font-weight: bold;
+  font-size: x-small;
 }
