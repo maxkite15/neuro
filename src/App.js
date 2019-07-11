@@ -8,6 +8,8 @@ import {Bar} from "react-chartjs-2";
 import stress from './testData/Stress.json';
 import load from './testData/CognitiveLoad.json';
 import lucidity from './testData/Lucidity.json';
+import Modal from 'react-bootstrap/Modal';
+import Button from 'react-bootstrap/Button';
 
 let socket = null;
 
@@ -21,6 +23,8 @@ export default class App extends Component {
         this.isPerfomanceStacked = null;
         this.tokenVal = null;
 
+        this.startDateOfAnalyze = new Date();
+
         console.log('Access token: ', this.tokenVal);
 
         this.state = {
@@ -31,7 +35,9 @@ export default class App extends Component {
             chartsData: {},
             prevDaysChartsData: {},
             startDate: new Date(),
-            selectedType: 'currDay'
+            selectedType: 'currDay',
+            userIdsSettingsShow: false,
+            userIds: []
         };
 
         this.getLabel = this.getLabel.bind(this);
@@ -41,6 +47,11 @@ export default class App extends Component {
         this.getDataByTimeout = this.getDataByTimeout.bind(this);
         this.updateData = this.updateData.bind(this);
         this.getPreviousDayData = this.getPreviousDayData.bind(this);
+        this.onUserIdDelete = this.onUserIdDelete.bind(this);
+        this.onUserIdChange = this.onUserIdChange.bind(this);
+        this.onUserIdsChange = this.onUserIdsChange.bind(this);
+        this.onUserSettingsClose = this.onUserSettingsClose.bind(this);
+
         this.lastHour = -1;
         this.lastMinutes = -1;
         this.background = {
@@ -61,12 +72,12 @@ export default class App extends Component {
 
     componentDidMount() {
         console.log('DID MOUNT');
-        let self = this;        
+        let self = this;
 
         socket = socketIOClient.apply(this, ['http://localhost:8180']);
         socket.on('NewToken', result=>{
             console.log('NEW TOKEN DATA: ', result);
-            this.tokenVal = result.token;
+            self.tokenVal = result.token;
             let expires_in = result.expires_in*1000;
             setTimeout(()=>{
                 let link = document.getElementById('updateTokenLink');
@@ -74,31 +85,38 @@ export default class App extends Component {
                 link.click();
             }, expires_in);
         });
-		socket.on('appConfig', result=>{
-			let app_config = result;
-			self.startTimeHour = app_config && (app_config.dayStartHour || app_config.dayStartHour===0) ? app_config.dayStartHour : 9;
-			self.endTimeHour = app_config && (app_config.dayEndHour || app_config.dayEndHour===0) ? app_config.dayEndHour : 18;
-			self.prevDaysCount = app_config && app_config.prevDaysCount ? app_config.prevDaysCount : 0;
-			self.isPerfomanceStacked = app_config && app_config.perfomanceStacked ? true : false;
-			let currDateTime = new Date();
-			let currHour = currDateTime.getHours();
-			let currMinute = currDateTime.getMinutes();
-			let timeCond = `Start=${self.getDateTimeStr(self.startTimeHour, 0)}&Stop=${self.getDateTimeStr(currHour, currMinute)}`;
-			let startData = self.initData(currHour, currMinute);
-			self.updateData(startData, timeCond, 'chartsData')
-				.then(result=>{
-					console.log(result);
-					self.getDataByTimeout(true);
-				}, err=>{
-					console.log('DID MOUNT ERROR: ', err);
-				});
-			if(self.prevDaysCount){
-				let currDate = new Date();
-				while(self.prevDaysCount>0){
-					self.getPreviousDayData(currDate);
-					self.prevDaysCount--;
-				}
-			}
+
+        socket.on('userIds', result=>{
+            self.setState({
+                userIds: result.userIds
+            });
+        });
+
+        socket.on('appConfig', result=>{
+            let app_config = result;
+            self.startTimeHour = app_config && (app_config.dayStartHour || app_config.dayStartHour===0) ? app_config.dayStartHour : 9;
+            self.endTimeHour = app_config && (app_config.dayEndHour || app_config.dayEndHour===0) ? app_config.dayEndHour : 18;
+            self.prevDaysCount = app_config && app_config.prevDaysCount ? app_config.prevDaysCount : 0;
+            self.isPerfomanceStacked = app_config && app_config.perfomanceStacked ? true : false;
+            let currDateTime = new Date();
+            let currHour = currDateTime.getHours();
+            let currMinute = currDateTime.getMinutes();
+            let timeCond = `Start=${self.getDateTimeStr(self.startTimeHour, 0)}&Stop=${self.getDateTimeStr(currHour, currMinute)}`;
+            let startData = self.initData(currHour, currMinute);
+            self.updateData(startData, timeCond, 'chartsData')
+                .then(result=>{
+                    console.log(result);
+                    self.getDataByTimeout(true);
+                }, err=>{
+                    console.log('DID MOUNT ERROR: ', err);
+                });
+            if(self.prevDaysCount){
+                let currDate = new Date();
+                while(self.prevDaysCount>0){
+                    self.getPreviousDayData(currDate);
+                    self.prevDaysCount--;
+                }
+            }
         });
     }
 
@@ -106,17 +124,20 @@ export default class App extends Component {
         let self = this;
         return new Promise((resolve, reject)=>{
             Promise.all([
-                this.getChartData(`/chart_data?${timeCond}&Group=feedback&Class=trigger-negative&Kind=Stress_Flag`),
-                this.getChartData(`/chart_data?${timeCond}&Group=feedback&Class=trigger-negative&Kind=CognitiveLoad_Flag`),
-                this.getChartData(`/chart_data?${timeCond}&Group=bio&Class=mental&Kind=Lucidity_Avg`)
+                this.getChartData(`/chart_data?${timeCond}&Group=bio&Class=mental&Kind=Stress_Avg`),
+                this.getChartData(`/chart_data?${timeCond}&Group=bio&Class=mental&Kind=CognitiveLoad_Avg`),
+                this.getChartData(`/chart_data?${timeCond}&Group=bio&Class=mental&Kind=Lucidity_Avg`),
+                this.getChartData(`/chart_data?${timeCond}&Group=bio&Class=mental&Kind=Enthusiasm_Avg`)
             ]).then(result=>{
                 console.log('RESULT: ', result);
                 let stressData = result[0].data;
                 let cognitiveLoadData = result[1].data;
                 let lucidityData = result[2].data;
+                let enthusiasmData = result[3].data;
                 self.formatData(stressData, currData, 'stress', stateKey==='prevDaysChartsData');
                 self.formatData(cognitiveLoadData, currData, 'cognitiveLoad', stateKey==='prevDaysChartsData');
                 self.formatData(lucidityData, currData, 'lucidity', stateKey==='prevDaysChartsData');
+                self.formatData(enthusiasmData, currData, 'enthusiasm', stateKey==='prevDaysChartsData');
                 self.setState({
                     [stateKey]: currData
                 });
@@ -130,6 +151,10 @@ export default class App extends Component {
 
     getPreviousDayData(currDate){
         currDate.setDate(currDate.getDate()-1);
+        if(this.startDateOfAnalyze.getTime() > currDate.getTime()){
+            //for update data after userIds change
+            this.startDateOfAnalyze = currDate;
+        }
         let key = this.getDateKey(currDate.getFullYear(), currDate.getMonth(), currDate.getDate());
         console.log('KEY=', key);
         let newData = this.state.prevDaysChartsData;
@@ -266,15 +291,15 @@ export default class App extends Component {
                 key = this.getDateKey(recDate.getFullYear(), recDate.getMonth(), recDate.getDate());
             }
             for(let i=0; i<iObj.s.length; i++){
-                if(iObj.s[i].v !== -2){
+                //if(iObj.s[i].v !== -2){
                     if(chartsData[key]) {
                         if (!chartsData[key][type]) chartsData[key][type] = {val: 0, count: 0};
                         chartsData[key][type].val += iObj.s[i].v;
                         chartsData[key][type].count++;
                     }
-                }
+                //}
                 //работоспособность
-                if(iObj.s[i].v === 0 || iObj.s[i].v === -2){
+                /*if(iObj.s[i].v === 0 || iObj.s[i].v === -2){
                     if(chartsData[key]) {
                         if (!chartsData[key]['performance']) chartsData[key]['performance'] = {count: 0};
                         chartsData[key]['performance'].count++;
@@ -285,19 +310,83 @@ export default class App extends Component {
                         if (!chartsData[key]['in_range']) chartsData[key]['in_range'] = {count: 0};
                         chartsData[key]['in_range'].count++;
                     }
-                }
+                }*/
             }
         });
     }
 
+    onUserIdDelete(ind){
+        let newUserIds = this.state.userIds;
+        newUserIds.splice(ind, 1);
+        this.setState({
+            userIds: newUserIds
+        });
+    }
 
+    onUserIdChange(e, ind){
+        let newUserIds = this.state.userIds;
+        newUserIds[ind]=e.target.value;
+        this.setState({
+            userIds: newUserIds
+        });
+    }
+
+    onUserIdsChange(e){
+        let newUserIds = e.target.value.replace(/ /g,'').split(',');
+        this.setState({
+            userIds: newUserIds
+        });
+    }
+
+    onUserSettingsClose(){
+        this.setState({
+            userIdsSettingsShow: false
+        });
+        let self = this;
+        let userIds = {
+            userIds: this.state.userIds.filter(item=>item.replace(/ /g,'')!='')
+        };
+        fetch('/update_user_ids', {
+            method: 'POST',
+            cache: 'no-cache',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(userIds)
+        })
+            .then(response=>{
+                if(response.status!==200) throw new Error(response.statusText);
+                console.log('Success userIds update');
+                let currDateTime = new Date();
+                let currHour = currDateTime.getHours();
+                let currMinute = currDateTime.getMinutes();
+                let timeCond = `Start=${self.getDateTimeStr(self.startTimeHour, 0)}&Stop=${self.getDateTimeStr(currHour, currMinute)}`;
+                let startData = self.initData(currHour, currMinute);
+                self.updateData(startData, timeCond, 'chartsData')
+                    .then(result=>{
+                        console.log('New data on user ids update: ', result);
+                    }, err=>{
+                        console.log('Update data on user ids change error: ', err);
+                    });
+                if(self.startDateOfAnalyze){
+                    while(this.startDateOfAnalyze.getDate()!==currDateTime.getDate() && self.startDateOfAnalyze.getTime()<currDateTime.getTime()){
+                        self.getPreviousDayData(currDateTime);
+                    }
+                }
+            })
+            .catch(err=>{
+                NotificationManager.error('Error on update userIds!');
+                console.log(err);
+            });
+    }
 
     render(){
-        const {clientId, redirectUri, stateVal, tokenVal, labels, stressData, lucidityData, cognitiveLoadData, courageData, chartsData, prevDaysChartsData, selectedType} = this.state;
+        const {clientId, redirectUri, stateVal, tokenVal, labels, stressData, lucidityData, cognitiveLoadData, courageData, chartsData, prevDaysChartsData, selectedType, userIdsSettingsShow, userIds} = this.state;
         let chartsLabels = [];
         let stressChartData = [];
         let cognitiveLoadChartData = [];
         let lucidityChartData = [];
+        let enthusiasmChartData = [];
         let performanceChartData = [];
         //for stacked chart
         let inRangeChartData = [];
@@ -320,6 +409,12 @@ export default class App extends Component {
                 } else {
                     lucidityChartData.push(0);
                 }
+                if (chartsData[key].enthusiasm) {
+                    enthusiasmChartData.push(Math.round(chartsData[key].enthusiasm.val / chartsData[key].enthusiasm.count));
+                } else {
+                    enthusiasmChartData.push(0);
+                }
+
                 if (chartsData[key].performance) {
                     performanceChartData.push(chartsData[key].performance.count);
                 } else {
@@ -351,6 +446,13 @@ export default class App extends Component {
                 } else {
                     lucidityChartData.push(0);
                 }
+                if (prevDaysChartsData[key] && prevDaysChartsData[key].enthusiasm) {
+                    enthusiasmChartData.push(Math.round(prevDaysChartsData[key].enthusiasm.val / prevDaysChartsData[key].enthusiasm.count));
+                } else {
+                    enthusiasmChartData.push(0);
+                }
+
+
                 if (prevDaysChartsData[key] && prevDaysChartsData[key].performance) {
                     performanceChartData.push(prevDaysChartsData[key].performance.count);
                 } else {
@@ -366,6 +468,8 @@ export default class App extends Component {
         const xLabel = selectedType === 'currDay' ? 'Время, мин' : 'Дата, дни';
         const yLabel = 'Коллективный уровень';
 
+        let userIdsStr = userIds.join(',');
+
         return (
             <div className="App">
                 <a id="updateTokenLink" target="_self" style={{display: 'none'}}>Token</a>
@@ -379,6 +483,8 @@ export default class App extends Component {
                            value="prevDays" checked={selectedType==='prevDays'} onChange={(e)=>this.setState({selectedType: 'prevDays'})}/>
                     <label className="form-check-label" htmlFor="inlineRadio2">Прошлые дни</label>
                 </div>
+                <button className="btn btn-link" style={{marginBottom: '5px', padding: '0'}} onClick={()=>this.setState({userIdsSettingsShow: true})}>Список пользователей</button>
+
                 <div className="Charts">
                     <div className="chart-block" >
                         <div className="chart-head">
@@ -431,10 +537,18 @@ export default class App extends Component {
 
                     <div className="chart-block">
                         <div className="chart-head">
-                            <span className="label" style={{color: `rgba(${this.background.performance.join(',')}, 1)`}}>Работоспособность</span>
+                            <span className="label" style={{color: `rgba(${this.background.performance.join(',')}, 1)`}}>Увлечённость</span>
                         </div>
                         <div className="chart-body">
-                            <ChartBar id="courageBar"
+                            <ChartBar id="cognitiveLoadBar"
+                                      content={[{
+                                          data: enthusiasmChartData,
+                                          label: 'Увлечённость',
+                                          color: this.background.performance
+                                      }]}
+                                      labels={chartsLabels}
+                                      xLabel={xLabel} yLabel={yLabel}/>
+                            {/*<ChartBar id="courageBar"
                                 content={this.isPerfomanceStacked ? [{
                                         data: performanceChartData,
                                         label: 'Вне диапазона/Нет сигнала',
@@ -452,23 +566,45 @@ export default class App extends Component {
                                 }
                                 labels={chartsLabels}
                                 showLegend={this.isPerfomanceStacked}
-                                xLabel={xLabel} yLabel="Количество событий"/>
+                                xLabel={xLabel} yLabel="Количество событий"/>*/}
                         </div>
                     </div>
                 </div>
 
                 <NotificationContainer/>
+
+                <Modal show={userIdsSettingsShow} onHide={this.onUserSettingsClose} dialogClassName="modal-30w">
+                    <Modal.Header closeButton>
+                        <Modal.Title>Список идентификаторов пользователей</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body  style={{'maxHeight': 'calc(100vh - 300px)', 'overflowY': 'auto'}}>
+                        <div className="form-group">
+                            <label htmlFor="exampleFormControlTextarea1">Введите идентификаторы пользователей через запятую:</label>
+                            <textarea className="form-control" id="exampleFormControlTextarea1" rows="3" value={userIdsStr} onChange={(e)=>this.onUserIdsChange(e)}></textarea>
+                        </div>
+                        {/*{userIds.map((item, ind)=>
+                            <div className="input-group mb-3" key={`user_id_${ind}`}>
+                                <input type="text" className="form-control" placeholder="User id"
+                                       aria-label="User id" value={item} onChange={(e)=>this.onUserIdChange(e, ind)}/>
+                                    <div className="input-group-append">
+                                        <Button className="btn btn-danger" onClick={e=>this.onUserIdDelete(ind)}>Удалить</Button>
+                                    </div>
+                            </div>
+                        )}
+                        <Button className="btn btn-primary" onClick={e=>{
+                            this.setState({
+                                userIds: this.state.userIds.concat('')
+                            });
+                        }}>Добавить</Button>*/}
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="secondary" onClick={this.onUserSettingsClose}>
+                            Закрыть
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
+
             </div>
         )
     }
 }
-
-/*function App() {
-  return (
-    <div className="App">
-      <Chart/>
-    </div>
-  );
-}
-
-export default App;*/
